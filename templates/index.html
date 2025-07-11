@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    Dashboard
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Webhook Endpoint</h6>
+                                        <p class="card-text">Ready to receive PR events</p>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-webhook fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Gemini AI</h6>
+                                        <p class="card-text">WordPress code analysis</p>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-brain fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Bitbucket Integration</h6>
+                                        <p class="card-text">Auto-comment on PRs</p>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fab fa-bitbucket fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-history me-2"></i>
+                                    Recent Webhook Events
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% if events %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>PR Title</th>
+                                                    <th>Status</th>
+                                                    <th>Event Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for event in events %}
+                                                <tr>
+                                                    <td>{{ event.timestamp }}</td>
+                                                    <td>
+                                                        <span class="text-truncate" style="max-width: 200px; display: inline-block;">
+                                                            {{ event.pr_title }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {% if event.status == 'success' %}
+                                                            <span class="badge bg-success">
+                                                                <i class="fas fa-check me-1"></i>Success
+                                                            </span>
+                                                        {% elif event.status == 'error' %}
+                                                            <span class="badge bg-danger">
+                                                                <i class="fas fa-times me-1"></i>Error
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="badge bg-warning">
+                                                                <i class="fas fa-clock me-1"></i>Processing
+                                                            </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <code>{{ event.event_type }}</code>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No webhook events received yet</p>
+                                        <p class="text-muted small">
+                                            Configure your Bitbucket repository webhook to point to:
+                                            <code>/webhook</code>
+                                        </p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-cog me-2"></i>
+                                    Configuration
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <h6>Webhook URL</h6>
+                                <div class="input-group mb-3">
+                                    <input type="text" class="form-control" value="{{ request.url_root }}webhook" readonly>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                
+                                <h6>Required Environment Variables</h6>
+                                <ul class="list-unstyled">
+                                    <li><code>BITBUCKET_EMAIL</code></li>
+                                    <li><code>BITBUCKET_API_TOKEN</code></li>
+                                    <li><code>GEMINI_API_KEY</code></li>
+                                    <li><code>SESSION_SECRET</code></li>
+                                </ul>
+                                
+                                <h6>Webhook Events</h6>
+                                <p class="text-muted small">
+                                    Configure your Bitbucket repository to send pull request events to the webhook URL above.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const input = document.querySelector('input[readonly]');
+    input.select();
+    document.execCommand('copy');
+    
+    // Show feedback
+    const button = document.querySelector('button[onclick="copyToClipboard()"]');
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-check"></i>';
+    setTimeout(() => {
+        button.innerHTML = originalHTML;
+    }, 2000);
+}
+</script>
+{% endblock %}

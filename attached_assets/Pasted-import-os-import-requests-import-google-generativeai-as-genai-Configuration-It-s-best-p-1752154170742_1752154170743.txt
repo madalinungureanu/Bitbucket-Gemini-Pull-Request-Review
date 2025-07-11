@@ -1,0 +1,100 @@
+import os
+import requests
+import google.generativeai as genai
+
+# --- Configuration ---
+# It's best practice to store these as environment variables.
+# Use your Atlassian account email and the API Token you created.
+BITBUCKET_EMAIL = os.environ.get("BITBUCKET_EMAIL") # Your Atlassian account email
+BITBUCKET_API_TOKEN = os.environ.get("BITBUCKET_API_TOKEN") # The API Token
+
+# --- Gemini API Key ---
+# Paste your key here if you are not using environment variables.
+GEMINI_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE"
+if not GEMINI_API_KEY or GEMINI_API_KEY == "PASTE_YOUR_GEMINI_API_KEY_HERE":
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Configure the Gemini client
+genai.configure(api_key=GEMINI_API_KEY)
+
+
+def get_pr_diff(diff_url: str) -> str:
+    """Fetches the diff of a pull request from its diff URL."""
+    try:
+        response = requests.get(
+            diff_url,
+            auth=(BITBUCKET_EMAIL, BITBUCKET_API_TOKEN)
+        )
+        response.raise_for_status()
+        return response.text
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching PR diff: {e}")
+        return None
+
+def analyze_code_with_gemini(diff: str) -> str:
+    """Sends the code diff to Gemini for analysis with a WordPress-specific prompt."""
+    model = genai.GenerativeModel('gemini-pro')
+    prompt = f"""
+    You are an expert WordPress developer and senior code reviewer.
+    Your task is to analyze the following code diff from a pull request.
+
+    Please provide feedback on the following aspects:
+    1.  **WordPress Coding Standards**: Does the code adhere to the official WordPress coding standards?
+    2.  **Security Vulnerabilities**: Look for common WordPress security issues (missing nonces, improper sanitization/escaping, SQL injection).
+    3.  **Performance**: Are there any obvious performance bottlenecks?
+    4.  **Best Practices**: Suggest improvements based on modern WordPress development best practices.
+    5.  **Bugs**: Identify any potential logical errors or bugs.
+
+    Format your review clearly using Markdown. If there are no issues, simply state that the code looks good.
+
+    Here is the code diff:
+    ```diff
+    {diff}
+    ```
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        return "An error occurred while analyzing the code with Gemini."
+
+def post_comment_to_bitbucket(comments_url: str, comment: str):
+    """Posts a comment to the Bitbucket pull request."""
+    payload = {"content": {"raw": comment}}
+    try:
+        response = requests.post(
+            comments_url,
+            json=payload,
+            auth=(BITBUCKET_EMAIL, BITBUCKET_API_TOKEN)
+        )
+        response.raise_for_status()
+        print("Successfully posted comment to Bitbucket.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error posting comment to Bitbucket: {e}")
+
+def handle_webhook_payload(payload: dict):
+    """Main handler for the Bitbucket webhook payload."""
+    try:
+        if payload['pullrequest']['state'] != 'OPEN':
+            print("PR is not open, skipping review.")
+            return
+
+        diff_url = payload['pullrequest']['links']['diff']['href']
+        comments_url = payload['pullrequest']['links']['comments']['href']
+        
+        print(f"Processing PR: {payload['pullrequest']['title']}")
+
+        # 1. Get the diff
+        diff_text = get_pr_diff(diff_url)
+        if not diff_text:
+            return
+
+        # 2. Analyze with Gemini
+        review_comment = analyze_code_with_gemini(diff_text)
+
+        # 3. Post the comment back to Bitbucket
+        post_comment_to_bitbucket(comments_url, review_comment)
+
+    except KeyError as e:
+        print(f"Webhook payload was missing an expected key: {e}")
