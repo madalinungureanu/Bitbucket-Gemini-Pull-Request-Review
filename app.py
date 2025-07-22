@@ -1,7 +1,8 @@
 import os
 import logging
+import threading
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, flash, redirect, url_for, current_app
+from flask import Flask, request, jsonify, render_template, flash, redirect, url_for
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -35,6 +36,43 @@ def save_recent_events(events):
 
 # Load existing events on startup
 recent_events = load_recent_events()
+
+# Deduplication system for webhook retries
+def load_processed_webhooks():
+    """Load processed webhook IDs from file"""
+    try:
+        with open('processed_webhooks.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_processed_webhooks(processed):
+    """Save processed webhook IDs to file"""
+    try:
+        with open('processed_webhooks.json', 'w') as f:
+            json.dump(processed, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save processed webhooks: {e}")
+
+def is_webhook_already_processed(pr_id, updated_on):
+    """Check if this specific PR update has already been processed"""
+    processed = load_processed_webhooks()
+    webhook_key = f"{pr_id}_{updated_on}"
+    return webhook_key in processed
+
+def mark_webhook_processed(pr_id, updated_on):
+    """Mark this PR update as processed"""
+    processed = load_processed_webhooks()
+    webhook_key = f"{pr_id}_{updated_on}"
+    processed[webhook_key] = datetime.now().isoformat()
+    
+    # Keep only last 100 processed webhooks to prevent file from growing too large
+    if len(processed) > 100:
+        # Remove oldest entries
+        sorted_items = sorted(processed.items(), key=lambda x: x[1])
+        processed = dict(sorted_items[-100:])
+    
+    save_processed_webhooks(processed)
 
 # Add some sample events if none exist (for demonstration)
 if not recent_events:
@@ -87,12 +125,27 @@ def webhook():
             logger.error("No JSON payload received")
             return jsonify({'error': 'No JSON payload'}), 400
         
+        # Extract PR information for deduplication
+        pr_data = payload.get('pullrequest', {})
+        pr_id = str(pr_data.get('id', 'unknown'))
+        pr_updated_on = pr_data.get('updated_on', '')
+        pr_title = pr_data.get('title', 'No title')
+        
+        # Check if this webhook has already been processed (deduplication)
+        if is_webhook_already_processed(pr_id, pr_updated_on):
+            logger.info(f"Webhook for PR {pr_id} already processed, skipping duplicate")
+            return jsonify({
+                'status': 'duplicate_skipped',
+                'message': 'This webhook has already been processed',
+                'pr_id': pr_id
+            }), 200
+        
         # Log the event
         event_info = {
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'event_type': payload.get('pullrequest', {}).get('state', 'unknown'),
-            'pr_title': payload.get('pullrequest', {}).get('title', 'No title'),
-            'pr_id': payload.get('pullrequest', {}).get('id', 'unknown'),
+            'event_type': pr_data.get('state', 'unknown'),
+            'pr_title': pr_title,
+            'pr_id': pr_id,
             'status': 'processing',
             'gemini_response': None
         }
@@ -107,21 +160,37 @@ def webhook():
         
         logger.info(f"Received webhook for PR: {event_info['pr_title']}")
         
-        # Process the webhook
-        try:
-            gemini_response = handle_webhook_payload(payload, current_app._get_current_object())
-            event_info['status'] = 'success'
-            event_info['gemini_response'] = gemini_response
-            logger.info("Webhook processed successfully")
-        except Exception as e:
-            event_info['status'] = 'error'
-            event_info['error'] = str(e)
-            logger.error(f"Error processing webhook: {e}")
+        # Respond quickly to prevent timeout, then process asynchronously
+        def process_webhook_async():
+            """Process webhook in background thread"""
+            try:
+                gemini_response = handle_webhook_payload(payload)
+                event_info['status'] = 'success'
+                event_info['gemini_response'] = gemini_response
+                
+                # Mark this webhook as processed to prevent duplicates
+                mark_webhook_processed(pr_id, pr_updated_on)
+                
+                logger.info("Webhook processed successfully")
+            except Exception as e:
+                event_info['status'] = 'error'
+                event_info['error'] = str(e)
+                logger.error(f"Error processing webhook: {e}")
+            
+            # Update the saved events with final status
+            save_recent_events(recent_events)
         
-        # Update the saved events with final status
-        save_recent_events(recent_events)
+        # Start background processing
+        thread = threading.Thread(target=process_webhook_async)
+        thread.daemon = True
+        thread.start()
         
-        return jsonify({'status': 'received'}), 200
+        # Return immediately to prevent webhook timeout
+        return jsonify({
+            'status': 'received',
+            'message': 'Webhook received and processing started',
+            'pr_id': pr_id
+        }), 200
         
     except Exception as e:
         logger.error(f"Webhook error: {e}")
