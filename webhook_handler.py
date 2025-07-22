@@ -51,11 +51,13 @@ You are an expert WordPress developer and senior code reviewer.
 Your task is to analyze the following code diff from a pull request.
 
 Please provide feedback on the following aspects:
-1. **Bugs**: Identify any potential logical errors or bugs.
-2. **Performance**: Are there any obvious performance bottlenecks?
-3. **Best Practices**: Suggest improvements based on modern WordPress development best practices if there are any.
+1. **WordPress Coding Standards**: Does the code adhere to the official WordPress coding standards?
+2. **Security Vulnerabilities**: Look for common WordPress security issues (missing nonces, improper sanitization/escaping, SQL injection, XSS vulnerabilities).
+3. **Performance**: Are there any obvious performance bottlenecks?
+4. **Best Practices**: Suggest improvements based on modern WordPress development best practices.
+5. **Bugs**: Identify any potential logical errors or bugs.
 
-Format your review clearly using Markdown. If there are no issues, simply state that the code looks good. Try to keep your response concise, ideally under 1000 characters.
+Format your review clearly using Markdown. If there are no issues, simply state that the code looks good.
 
 Here is the code diff:
 ```diff
