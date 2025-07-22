@@ -16,12 +16,7 @@ BITBUCKET_EMAIL = os.environ.get("BITBUCKET_EMAIL")
 BITBUCKET_API_TOKEN = os.environ.get("BITBUCKET_API_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Initialize Gemini client
-if GEMINI_API_KEY:
-    client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    client = None
-    logger.warning("GEMINI_API_KEY not set")
+
 
 def get_pr_diff(diff_url: str) -> str:
     """Fetches the diff of a pull request from its diff URL."""
@@ -44,9 +39,11 @@ def get_pr_diff(diff_url: str) -> str:
 
 def analyze_code_with_gemini(diff: str) -> str:
     """Sends the code diff to Gemini for analysis with a WordPress-specific prompt."""
-    if not client:
-        logger.error("Gemini client not initialized")
+    if not GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY not set")
         return "Error: Gemini API not configured"
+    
+    client = genai.Client(api_key=GEMINI_API_KEY)
     
     try:
         prompt = f"""
@@ -133,7 +130,8 @@ def mark_event_as_processed(event_id: str):
         with open(RECENT_EVENTS_FILE, 'w') as f:
             json.dump(recent_events, f, indent=4)
 
-def process_webhook_in_background(payload: dict):
+def process_webhook_in_background(app, payload: dict):
+    with app.app_context():
     """This function runs in a background thread to handle the webhook logic."""
     try:
         # Check if PR is open
@@ -170,7 +168,7 @@ def process_webhook_in_background(payload: dict):
         logger.error(f"Error processing webhook in background: {e}")
 
 
-def handle_webhook_payload(payload: dict):
+def handle_webhook_payload(payload: dict, app):
     """
     Main handler for the Bitbucket webhook payload.
     This function now handles webhook de-duplication and acknowledges
