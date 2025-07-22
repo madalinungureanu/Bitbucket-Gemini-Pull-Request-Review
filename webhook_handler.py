@@ -197,7 +197,7 @@ def handle_webhook_payload(payload: dict):
         mark_event_as_processed(event_id)
 
         # Run the actual processing in a background thread
-        thread = threading.Thread(target=copy_context(process_webhook_in_background), args=(payload,))
+        thread = threading.Thread(target=process_webhook_in_background, args=(app, payload))
         thread.start()
 
         logger.info(f"Webhook for event {event_id} received and accepted for background processing.")

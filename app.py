@@ -109,7 +109,7 @@ def webhook():
         
         # Process the webhook
         try:
-            gemini_response = handle_webhook_payload(payload)
+            gemini_response = handle_webhook_payload(payload, current_app._get_current_object())
             event_info['status'] = 'success'
             event_info['gemini_response'] = gemini_response
             logger.info("Webhook processed successfully")
