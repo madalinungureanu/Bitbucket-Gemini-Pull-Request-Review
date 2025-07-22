@@ -55,10 +55,22 @@ def save_processed_webhooks(processed):
         logger.error(f"Failed to save processed webhooks: {e}")
 
 def is_webhook_already_processed(pr_id, updated_on):
-    """Check if this specific PR update has already been processed"""
+    """Check if this specific PR update has already been processed
+    
+    Uses PR ID + updated_on timestamp to distinguish between:
+    - True duplicates (same PR, same timestamp) = webhook retries
+    - Legitimate updates (same PR, different timestamp) = new commits
+    """
     processed = load_processed_webhooks()
     webhook_key = f"{pr_id}_{updated_on}"
-    return webhook_key in processed
+    is_duplicate = webhook_key in processed
+    
+    if is_duplicate:
+        logger.info(f"Found duplicate webhook: PR {pr_id} with timestamp {updated_on}")
+    else:
+        logger.info(f"New webhook: PR {pr_id} with timestamp {updated_on}")
+    
+    return is_duplicate
 
 def mark_webhook_processed(pr_id, updated_on):
     """Mark this PR update as processed"""
@@ -133,12 +145,15 @@ def webhook():
         
         # Check if this webhook has already been processed (deduplication)
         if is_webhook_already_processed(pr_id, pr_updated_on):
-            logger.info(f"Webhook for PR {pr_id} already processed, skipping duplicate")
+            logger.info(f"Skipping duplicate webhook retry for PR {pr_id} (same timestamp: {pr_updated_on})")
             return jsonify({
                 'status': 'duplicate_skipped',
-                'message': 'This webhook has already been processed',
-                'pr_id': pr_id
+                'message': 'This webhook retry has already been processed',
+                'pr_id': pr_id,
+                'updated_on': pr_updated_on
             }), 200
+        
+        logger.info(f"Processing {'updated' if pr_updated_on else 'new'} PR {pr_id}: {pr_title}")
         
         # Log the event
         event_info = {

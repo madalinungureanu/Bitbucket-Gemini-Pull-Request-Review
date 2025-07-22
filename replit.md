@@ -102,6 +102,12 @@ The application is designed to be lightweight, focused on WordPress code review 
 
 ## Recent Changes
 
+### 2025-07-22 - Webhook Timeout and Deduplication Fix
+- **Duplicate Prevention**: Implemented intelligent webhook deduplication using PR ID + timestamp
+- **Timeout Resolution**: Added asynchronous processing to respond quickly and prevent Bitbucket timeouts
+- **Update Handling**: System correctly distinguishes between webhook retries (skipped) and PR updates (processed)
+- **Improved Logging**: Enhanced logging to clearly show when webhooks are duplicates vs legitimate updates
+
 ### 2025-07-10 - Full System Deployment and Testing
 - **Webhook Integration**: Successfully resolved 301 redirect issues and established working webhook endpoint
 - **Event Persistence**: Implemented file-based storage for webhook events to persist across application restarts
