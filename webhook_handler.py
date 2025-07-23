@@ -73,7 +73,7 @@ Please provide feedback on the following aspects:
 2. **Performance**: Are there any obvious performance bottlenecks?
 3. **Best Practices**: Suggest improvements based on modern WordPress development best practices.
 
-Format your review clearly using Markdown. If there are no issues, simply state that the code looks good. Try to be concise and keep your response under 1000 characters.
+Format your review clearly using Markdown. If there are no issues, simply state that the code looks good. Try to be concise and keep your response under 2000 characters.
 
 Here is the code diff:
 ```diff
