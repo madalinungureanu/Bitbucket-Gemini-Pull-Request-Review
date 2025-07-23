@@ -1,0 +1,3 @@
+The first commit worked pretty consistantly but it had problems that it was potsting up to three messages for the same webhook trigger. The webhook got a TIMEOUT repsponse and the bitbucket mechanism tries up to three times if a 200 response is not received. 
+Iterated with replit to solve this issue, it may have complicated things because it took a lot of back and forward to make it work (I hope it is robust) It might have just needed to throw a 200 response quicker in the first version and not complicate things with unique id's and retries. 
+Will see how it works but I can always try to reiterate again from the first commit. 
