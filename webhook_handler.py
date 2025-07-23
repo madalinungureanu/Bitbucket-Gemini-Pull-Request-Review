@@ -1,6 +1,8 @@
 import os
 import requests
 import logging
+import time
+import ssl
 from google import genai
 from google.genai import types
 
@@ -56,39 +58,56 @@ def analyze_code_with_gemini(diff: str) -> str:
         logger.error("Gemini client not initialized")
         return "Error: Gemini API not configured"
     
-    try:
-        prompt = f"""
+    # Retry logic for SSL/network issues
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            prompt = f"""
 You are an expert WordPress developer and senior code reviewer.
 Your task is to analyze the following code diff from a pull request.
 
 Please provide feedback on the following aspects:
-1. **WordPress Coding Standards**: Does the code adhere to the official WordPress coding standards?
-2. **Security Vulnerabilities**: Look for common WordPress security issues (missing nonces, improper sanitization/escaping, SQL injection, XSS vulnerabilities).
-3. **Performance**: Are there any obvious performance bottlenecks?
-4. **Best Practices**: Suggest improvements based on modern WordPress development best practices.
-5. **Bugs**: Identify any potential logical errors or bugs.
+1. **Bugs**: Identify any potential logical errors or bugs.
+2. **Performance**: Are there any obvious performance bottlenecks?
+3. **Best Practices**: Suggest improvements based on modern WordPress development best practices.
 
-Format your review clearly using Markdown. If there are no issues, simply state that the code looks good.
+Format your review clearly using Markdown. If there are no issues, simply state that the code looks good. Try to be concise and keep your response under 1000 characters.
 
 Here is the code diff:
 ```diff
 {diff}
 ```
 """
-        
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        
-        return response.text or "No analysis available"
-    except Exception as e:
-        logger.error(f"Error calling Gemini API: {e}")
-        logger.error(f"Error type: {type(e).__name__}")
-        logger.error(f"Diff length: {len(diff)} characters")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        return f"An error occurred while analyzing the code with Gemini: {str(e)}"
+            
+            logger.info(f"Attempting Gemini API call (attempt {attempt + 1}/{max_retries})")
+            
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            
+            logger.info(f"Gemini API call successful on attempt {attempt + 1}")
+            return response.text or "No analysis available"
+            
+        except (ssl.SSLError, ConnectionError, OSError) as e:
+            logger.warning(f"Network/SSL error on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error("All retry attempts failed for Gemini API")
+                return f"Network connectivity issue with Gemini API after {max_retries} attempts. SSL/TLS connection failed: {str(e)}"
+                
+        except Exception as e:
+            logger.error(f"Non-retryable error calling Gemini API: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Diff length: {len(diff)} characters")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return f"An error occurred while analyzing the code with Gemini: {str(e)}"
 
 def post_comment_to_bitbucket(comments_url: str, comment: str):
     """Posts a comment to the Bitbucket pull request."""

@@ -102,10 +102,13 @@ The application is designed to be lightweight, focused on WordPress code review 
 
 ## Recent Changes
 
-### 2025-07-22 - Webhook Timeout and Deduplication Fix
+### 2025-07-22 - SSL/Network Resilience and Error Handling
+- **SSL Error Handling**: Added retry logic for Gemini API SSL connection failures with exponential backoff
+- **Network Resilience**: System now automatically retries failed API calls up to 3 times
 - **Duplicate Prevention**: Implemented intelligent webhook deduplication using PR ID + timestamp
 - **Timeout Resolution**: Added asynchronous processing to respond quickly and prevent Bitbucket timeouts
 - **Update Handling**: System correctly distinguishes between webhook retries (skipped) and PR updates (processed)
+- **Enhanced Error Reporting**: Better error messages posted to PRs when API calls fail
 - **Improved Logging**: Enhanced logging to clearly show when webhooks are duplicates vs legitimate updates
 
 ### 2025-07-10 - Full System Deployment and Testing
