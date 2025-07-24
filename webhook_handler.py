@@ -45,8 +45,8 @@ def get_pr_diff(diff_url: str) -> str:
             decoded_url = unquote(diff_url)
             logger.info(f"Decoded URL: {decoded_url}")
             
-            # Remove any problematic whitespace characters
-            cleaned_url = decoded_url.replace('\r', '').replace('\n', '').strip()
+            # Replace newlines with '..' to form a valid commit range
+            cleaned_url = decoded_url.replace('\r\n', '..').replace('\r', '..').replace('\n', '..').strip()
             
             # Re-encode properly if needed (but most of the URL should be fine as-is)
             # We only need to re-encode the parts after the domain that contain special characters
