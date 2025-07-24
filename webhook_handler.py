@@ -6,6 +6,7 @@ import ssl
 from google import genai
 from google.genai import types
 import httpx
+from urllib.parse import unquote, quote
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -33,6 +34,52 @@ def get_pr_diff(diff_url: str) -> str:
             logger.error(
                 f"BITBUCKET_API_TOKEN exists: {bool(BITBUCKET_API_TOKEN)}")
             return ""
+
+        # Clean up the URL to handle encoding issues
+        logger.info(f"Original diff URL: {diff_url}")
+        
+        # First decode any URL encoding, then re-encode properly
+        # This handles cases where there are unwanted characters like %0D (carriage return)
+        try:
+            # Decode the URL first
+            decoded_url = unquote(diff_url)
+            logger.info(f"Decoded URL: {decoded_url}")
+            
+            # Remove any problematic whitespace characters
+            cleaned_url = decoded_url.replace('\r', '').replace('\n', '').strip()
+            
+            # Re-encode properly if needed (but most of the URL should be fine as-is)
+            # We only need to re-encode the parts after the domain that contain special characters
+            if '/repositories/' in cleaned_url:
+                base_part, path_part = cleaned_url.split('/repositories/', 1)
+                # Split path into URL path and query parameters
+                if '?' in path_part:
+                    url_path, query_params = path_part.split('?', 1)
+                else:
+                    url_path = path_part
+                    query_params = ""
+                
+                # Only re-encode the repository and path parts that contain special characters
+                path_parts = url_path.split('/')
+                encoded_parts = []
+                for part in path_parts:
+                    if ':' in part:
+                        # This is likely a branch/commit reference, encode carefully
+                        encoded_parts.append(quote(part, safe=':'))
+                    else:
+                        encoded_parts.append(part)
+                
+                cleaned_url = base_part + '/repositories/' + '/'.join(encoded_parts)
+                if query_params:
+                    cleaned_url += '?' + query_params
+            
+            logger.info(f"Cleaned URL: {cleaned_url}")
+            diff_url = cleaned_url
+            
+        except Exception as url_error:
+            logger.warning(f"URL cleaning failed, using original: {url_error}")
+            # Fall back to original URL if cleaning fails
+            pass
 
         logger.info(f"Making authenticated request to: {diff_url}")
         logger.info(f"Using email: {BITBUCKET_EMAIL}")

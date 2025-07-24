@@ -102,6 +102,13 @@ The application is designed to be lightweight, focused on WordPress code review 
 
 ## Recent Changes
 
+### 2025-07-24 - URL Encoding and Protocol Error Fixes
+- **URL Encoding Fix**: Fixed Bitbucket diff URL encoding issues that caused API failures
+- **Carriage Return Handling**: Automatically removes %0D and other problematic characters from URLs
+- **Protocol Error Resilience**: Added retry logic for httpx.RemoteProtocolError (server disconnection)
+- **Smart URL Reconstruction**: Proper URL decoding/encoding while preserving query parameters
+- **Enhanced Logging**: Added detailed URL cleaning logs for debugging
+
 ### 2025-07-22 - SSL/Network Resilience and Error Handling
 - **SSL Error Handling**: Added retry logic for Gemini API SSL connection failures with exponential backoff
 - **Network Resilience**: System now automatically retries failed API calls up to 3 times
